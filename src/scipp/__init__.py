@@ -105,3 +105,7 @@ del _cls
 del _binding
 
 from . import data
+
+from ._numpy import _array_ufunc, _array_function
+setattr(Variable, '__array_ufunc__', _array_ufunc)
+setattr(Variable, '__array_function__', _array_function)
