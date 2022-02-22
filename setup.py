@@ -61,7 +61,7 @@ setup(name='scipp',
       extras_require={
           "test": [
               "pytest", "matplotlib", "xarray", "pandas", "pythreejs",
-              "sphinx-autodoc-typehints>=1.17.0"
+              "sphinx-autodoc-typehints>=1.17.0", "hypothesis"
           ],
           'all': ['h5py', 'scipy>=1.7.0', 'graphviz'],
           'interactive': [
