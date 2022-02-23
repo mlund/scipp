@@ -341,20 +341,47 @@ def test_ixor():
     assert sc.identical(a, b)
 
 
-def test_binary_plus():
-    a, b, a_slice, b_slice, data = make_variables()
+# TODO these tests are flaky because of very large / small floats
+
+
+@given(scst.n_variables(2))
+def test_binary_plus_with_two_variables(inp):
+    a, b = inp
     c = a + b
-    assert np.array_equal(c.values, data + data)
-    c = a + 2.0
-    assert np.array_equal(c.values, data + 2.0)
+    np.testing.assert_allclose(c.values, a.values + b.values)
+
+
+@given(a=scst.variables(unit='one'), b=st.floats())
+def test_binary_plus_variable_with_number(a, b):
+    c = a + b
+    np.testing.assert_allclose(c.values, a.values + b)
+    c = b + a
+    np.testing.assert_allclose(c.values, b + a.values)
+
+
+@given(scst.n_variables(2, ndim=st.integers(min_value=1, max_value=4)))
+def test_binary_plus_variable_with_slice(inp):
+    a, b = inp
+    b_slice = b[b.dims[0], :]
     c = a + b_slice
-    assert np.array_equal(c.values, data + data)
+    np.testing.assert_allclose(c.values, a.values + b.values)
+
+
+@given(scst.n_variables(2))
+def test_binary_inplace_plus_with_two_variables(inp):
+    a, b = inp
+    c = a.copy()
     c += b
-    assert np.array_equal(c.values, data + data + data)
+    np.testing.assert_allclose(c.values, a.values + b.values)
+
+
+@given(scst.n_variables(2, ndim=st.integers(min_value=1, max_value=4)))
+def test_binary_inplace_plus_variable_with_slice(inp):
+    a, b = inp
+    b_slice = b[b.dims[0], :]
+    c = a.copy()
     c += b_slice
-    assert np.array_equal(c.values, data + data + data + data)
-    c = 3.5 + c
-    assert np.array_equal(c.values, data + data + data + data + 3.5)
+    np.testing.assert_allclose(c.values, a.values + b.values)
 
 
 def test_binary_minus():
