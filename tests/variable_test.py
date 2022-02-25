@@ -2,6 +2,7 @@
 # Copyright (c) 2022 Scipp contributors (https://github.com/scipp)
 # @file
 # @author Simon Heybrock
+from functools import partial
 import os
 
 from hypothesis import given, settings
@@ -341,47 +342,60 @@ def test_ixor():
     assert sc.identical(a, b)
 
 
-# TODO these tests are flaky because of very large / small floats
+# Parameters chosen such that arithmetic tests can use exact comparisons
+# and to avoid integer over-/underflow.
+variables_for_arithmetic = partial(scst.variables,
+                                   dtype='int64',
+                                   elements=st.integers(min_value=-1000,
+                                                        max_value=1000))
+n_variables_for_arithmetic = partial(scst.n_variables,
+                                     dtype='int64',
+                                     elements=st.integers(min_value=-1000,
+                                                          max_value=1000))
+numbers_for_arithmetic = st.integers(min_value=-1000, max_value=1000)
 
 
-@given(scst.n_variables(2))
+@given(n_variables_for_arithmetic(2))
 def test_binary_plus_with_two_variables(inp):
     a, b = inp
-    c = a + b
-    np.testing.assert_allclose(c.values, a.values + b.values)
+    c = sc.zeros_like(a)
+    c.values = a.values + b.values
+    assert sc.identical(a + b, c)
 
 
-@given(a=scst.variables(unit='one'), b=st.floats())
+@given(a=variables_for_arithmetic(unit='one'), b=numbers_for_arithmetic)
 def test_binary_plus_variable_with_number(a, b):
-    c = a + b
-    np.testing.assert_allclose(c.values, a.values + b)
-    c = b + a
-    np.testing.assert_allclose(c.values, b + a.values)
+    c = sc.zeros_like(a)
+    c.values = a.values + b
+    assert sc.identical(a + b, c)
+    c.values = b + a.values
+    assert sc.identical(a + b, c)
 
 
-@given(scst.n_variables(2, ndim=st.integers(min_value=1, max_value=4)))
+@given(n_variables_for_arithmetic(2, ndim=st.integers(min_value=1, max_value=4)))
 def test_binary_plus_variable_with_slice(inp):
     a, b = inp
     b_slice = b[b.dims[0], :]
-    c = a + b_slice
-    np.testing.assert_allclose(c.values, a.values + b.values)
+    c = sc.zeros_like(a)
+    c.values = a.values + b_slice.values
+    assert sc.identical(a + b_slice, c)
 
 
-@given(scst.n_variables(2))
+@given(n_variables_for_arithmetic(2))
 def test_binary_inplace_plus_with_two_variables(inp):
     a, b = inp
     c = a.copy()
     c += b
-    np.testing.assert_allclose(c.values, a.values + b.values)
+    assert sc.identical(c, a + b)
 
 
-@given(scst.n_variables(2, ndim=st.integers(min_value=1, max_value=4)))
+@given(n_variables_for_arithmetic(2, ndim=st.integers(min_value=1, max_value=4)))
 def test_binary_inplace_plus_variable_with_slice(inp):
     a, b = inp
     b_slice = b[b.dims[0], :]
     c = a.copy()
     c += b_slice
-    np.testing.assert_allclose(c.values, a.values + b.values)
+    assert sc.identical(c, a + b_slice)
 
 
 def test_binary_minus():
