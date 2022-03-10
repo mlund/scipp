@@ -2,15 +2,11 @@
 # Copyright (c) 2022 Scipp contributors (https://github.com/scipp)
 # @file
 # @author Simon Heybrock
-from functools import partial
 import os
 
-from hypothesis import given, settings
-import hypothesis.strategies as st
 import numpy as np
 import pytest
 
-from scipp.testing import strategies as scst
 import scipp as sc
 
 from .common import assert_export
@@ -25,32 +21,26 @@ def make_variables():
     return a, b, a_slice, b_slice, data
 
 
-@settings(max_examples=20)
-@given(var=scst.variables(dtype=scst.integer_dtypes()),
-       target_dtype=scst.floating_dtypes())
-def test_astype_int_to_float(var, target_dtype):
-    original = var.copy()
-    res = var.astype(target_dtype)
-    assert res.dtype == target_dtype
-    assert res.unit == original.unit
+def test_astype():
+    var = sc.Variable(dims=['x'],
+                      values=np.array([1, 2, 3, 4], dtype=np.int64),
+                      unit='s')
+    assert var.dtype == sc.DType.int64
+    assert var.unit == sc.units.s
+
+    for target_dtype in (sc.DType.float64, float, 'float64'):
+        var_as_float = var.astype(target_dtype)
+        assert var_as_float.dtype == sc.DType.float64
+        assert var_as_float.unit == sc.units.s
 
 
-@settings(max_examples=20)
-@given(var=scst.variables(dtype=scst.floating_dtypes(), with_variances=False),
-       target_dtype=scst.integer_dtypes())
-def test_astype_float_to_int(var, target_dtype):
-    original = var.copy()
-    res = var.astype(target_dtype)
-    assert res.dtype == target_dtype
-    assert res.unit == original.unit
+def test_astype_bad_conversion():
+    var = sc.Variable(dims=['x'], values=np.array([1, 2, 3, 4], dtype=np.int64))
+    assert var.dtype == sc.DType.int64
 
-
-@settings(max_examples=20)
-@given(var=scst.variables(dtype=scst.scalar_numeric_dtypes()))
-@pytest.mark.parametrize('target_dtype', (sc.DType.string, str, 'str'))
-def test_astype_bad_conversion(var, target_dtype):
-    with pytest.raises(sc.DTypeError):
-        var.astype(target_dtype)
+    for target_dtype in (sc.DType.string, str, 'str'):
+        with pytest.raises(sc.DTypeError):
+            var.astype(target_dtype)
 
 
 def test_astype_datetime():
@@ -342,60 +332,20 @@ def test_ixor():
     assert sc.identical(a, b)
 
 
-# Parameters chosen such that arithmetic tests can use exact comparisons
-# and to avoid integer over-/underflow.
-variables_for_arithmetic = partial(scst.variables,
-                                   dtype='int64',
-                                   elements=st.integers(min_value=-1000,
-                                                        max_value=1000))
-n_variables_for_arithmetic = partial(scst.n_variables,
-                                     dtype='int64',
-                                     elements=st.integers(min_value=-1000,
-                                                          max_value=1000))
-numbers_for_arithmetic = st.integers(min_value=-1000, max_value=1000)
-
-
-@given(n_variables_for_arithmetic(2))
-def test_binary_plus_with_two_variables(inp):
-    a, b = inp
-    c = sc.zeros_like(a)
-    c.values = a.values + b.values
-    assert sc.identical(a + b, c)
-
-
-@given(a=variables_for_arithmetic(unit='one'), b=numbers_for_arithmetic)
-def test_binary_plus_variable_with_number(a, b):
-    c = sc.zeros_like(a)
-    c.values = a.values + b
-    assert sc.identical(a + b, c)
-    c.values = b + a.values
-    assert sc.identical(a + b, c)
-
-
-@given(n_variables_for_arithmetic(2, ndim=st.integers(min_value=1, max_value=4)))
-def test_binary_plus_variable_with_slice(inp):
-    a, b = inp
-    b_slice = b[b.dims[0], :]
-    c = sc.zeros_like(a)
-    c.values = a.values + b_slice.values
-    assert sc.identical(a + b_slice, c)
-
-
-@given(n_variables_for_arithmetic(2))
-def test_binary_inplace_plus_with_two_variables(inp):
-    a, b = inp
-    c = a.copy()
+def test_binary_plus():
+    a, b, a_slice, b_slice, data = make_variables()
+    c = a + b
+    assert np.array_equal(c.values, data + data)
+    c = a + 2.0
+    assert np.array_equal(c.values, data + 2.0)
+    c = a + b_slice
+    assert np.array_equal(c.values, data + data)
     c += b
-    assert sc.identical(c, a + b)
-
-
-@given(n_variables_for_arithmetic(2, ndim=st.integers(min_value=1, max_value=4)))
-def test_binary_inplace_plus_variable_with_slice(inp):
-    a, b = inp
-    b_slice = b[b.dims[0], :]
-    c = a.copy()
+    assert np.array_equal(c.values, data + data + data)
     c += b_slice
-    assert sc.identical(c, a + b_slice)
+    assert np.array_equal(c.values, data + data + data + data)
+    c = 3.5 + c
+    assert np.array_equal(c.values, data + data + data + data + 3.5)
 
 
 def test_binary_minus():
